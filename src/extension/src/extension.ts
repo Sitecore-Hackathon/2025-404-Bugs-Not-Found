@@ -13,10 +13,7 @@ function activate(context: { subscriptions: any[] }) {
       const componentType = await vscode.window.showQuickPick(
         [
           { label: "With Datasource Check", value: "withDatasourceCheck" },
-          {
-            label: "With Datasource Rendering",
-            value: "withDatasourceRendering",
-          },
+          { label: "With Datasource Rendering", value: "withDatasourceRendering" },
           { label: "Default", value: "default" },
         ],
         { placeHolder: "Select the component return type", canPickMany: false }
@@ -34,31 +31,45 @@ function activate(context: { subscriptions: any[] }) {
       );
       if (!placeholderType) return; // User cancelled the input
 
-      // Ask the third question about fields
-      const fields = await vscode.window.showQuickPick(
-        [
-          { label: "Heading", value: "heading", isRequired: false },
-          { label: "Copy", value: "copy", isRequired: false },
-          { label: "Image", value: "image", isRequired: false },
-          { label: "Link", value: "link", isRequired: false },
-        ],
-        {
-          placeHolder: "Select the fields for the component",
-          canPickMany: true,
-        }
-      );
-      if (!fields) return; // User cancelled the input
+      // Ask the user to input custom fields
+      const fields: Array<{ label: string; value: string; isRequired: boolean }> = [];
+      let addMoreFields = true;
 
-      for (const field of fields) {
+      while (addMoreFields) {
+        const fieldName = await vscode.window.showInputBox({
+          placeHolder: "Enter the field name (e.g., heading, copy, image, link)",
+        });
+        if (!fieldName) break; // User cancelled the input
+
+        const fieldType = await vscode.window.showQuickPick(
+          [
+            { label: "Text", value: "Field<string>" },
+            { label: "Image", value: "ImageField" },
+            { label: "Link", value: "LinkField" },
+          ],
+          { placeHolder: "Select the field type", canPickMany: false }
+        );
+        if (!fieldType) break; // User cancelled the input
+
         const isRequired = await vscode.window.showQuickPick(
           [
             { label: "Yes", value: true },
             { label: "No", value: false },
           ],
-          { placeHolder: `Is ${field.label} required?`, canPickMany: false }
+          { placeHolder: `Is ${fieldName} required?`, canPickMany: false }
         );
-        if (!isRequired) return; // User cancelled the input
-        field.isRequired = isRequired.value;
+        if (!isRequired) break; // User cancelled the input
+
+        fields.push({ label: fieldName, value: fieldType.value, isRequired: isRequired.value });
+
+        const addMore = await vscode.window.showQuickPick(
+          [
+            { label: "Yes", value: true },
+            { label: "No", value: false },
+          ],
+          { placeHolder: "Do you want to add more fields?", canPickMany: false }
+        );
+        if (!addMore || !addMore.value) addMoreFields = false;
       }
 
       // return value snippet
@@ -83,30 +94,20 @@ function activate(context: { subscriptions: any[] }) {
           returnSnippet = `export default ${componentName};`;
       }
 
-      fields.forEach((field: { label: string; value: string }) => {
+      fields.forEach((field) => {
         switch (field.value) {
-          case "heading":
-            !fieldsTypesImports.includes("Field") &&
-              fieldsTypesImports.push("Field");
+          case "Field<string>":
+            !fieldsTypesImports.includes("Field") && fieldsTypesImports.push("Field");
             !fieldsImports.includes("Text") && fieldsImports.push("Text");
             break;
 
-          case "copy":
-            !fieldsTypesImports.includes("Field") &&
-              fieldsTypesImports.push("Field");
-            !fieldsImports.includes("RichText") &&
-              fieldsImports.push("RichText");
-            break;
-
-          case "image":
-            !fieldsTypesImports.includes("ImageField") &&
-              fieldsTypesImports.push("ImageField");
+          case "ImageField":
+            !fieldsTypesImports.includes("ImageField") && fieldsTypesImports.push("ImageField");
             !fieldsImports.includes("Image") && fieldsImports.push("Image");
             break;
 
-          case "link":
-            !fieldsTypesImports.includes("LinkField") &&
-              fieldsTypesImports.push("LinkField");
+          case "LinkField":
+            !fieldsTypesImports.includes("LinkField") && fieldsTypesImports.push("LinkField");
             !fieldsImports.includes("Link") && fieldsImports.push("Link");
             break;
 
@@ -118,8 +119,7 @@ function activate(context: { subscriptions: any[] }) {
       switch (placeholderType.value) {
         case "placeholder":
         case "dynamicPlaceholder":
-          !fieldsTypesImports.includes("Placeholder") &&
-            fieldsTypesImports.push("Placeholder");
+          !fieldsTypesImports.includes("Placeholder") && fieldsTypesImports.push("Placeholder");
           break;
 
         default:
@@ -131,60 +131,34 @@ function activate(context: { subscriptions: any[] }) {
 
       const interfaceFields: string[] = [];
 
-      fields.forEach((field: { label: string; value: string }) => {
-        switch (field.value) {
-          case "heading":
-            interfaceFields.push("heading: Field<string>;");
-            break;
-
-          case "copy":
-            interfaceFields.push("copy: Field<string>;");
-            break;
-
-          case "image":
-            interfaceFields.push("image: ImageField;");
-            break;
-
-          case "link":
-            interfaceFields.push("link: LinkField;");
-            break;
-
-          default:
-            break;
-        }
+      fields.forEach((field) => {
+        interfaceFields.push(`${field.label}: ${field.value};`);
       });
 
       const interfaceFieldsString = interfaceFields.join("\n    ");
 
       const fieldsMarkup = fields
-        .map((field: { label: string; value: string; isRequired: boolean }) => {
+        .map((field) => {
           switch (field.value) {
-            case "heading":
+            case "Field<string>":
               if (!field.isRequired) {
-                return `{fields.heading && fields.heading.value && (<Text field={fields.heading}/>)}`;
+                return `{fields.${field.label} && fields.${field.label}.value && (<Text field={fields.${field.label}}/>)}`;
               } else {
-                return `<Text field={fields.heading} />`;
+                return `<Text field={fields.${field.label}} />`;
               }
 
-            case "copy":
+            case "ImageField":
               if (!field.isRequired) {
-                return `{fields.copy && fields.copy.value && (<RichText field={fields.copy}/>)}`;
+                return `{fields.${field.label} && fields.${field.label}.src && (<Image field={fields.${field.label}}/>)}`;
               } else {
-                return `<RichText field={fields.copy} />`;
+                return `<Image field={fields.${field.label}} />`;
               }
 
-            case "image":
+            case "LinkField":
               if (!field.isRequired) {
-                return `{fields.image && fields.image.src && (<Image field={fields.image}/>)}`;
+                return `{fields.${field.label} && fields.${field.label}.href && (<Link field={fields.${field.label}}/>)}`;
               } else {
-                return `<Image field={fields.image} />`;
-              }
-
-            case "link":
-              if (!field.isRequired) {
-                return `{fields.link && fields.link.href && (<Link field={fields.link}/>)}`;
-              } else {
-                return `<Link field={fields.link} />`;
+                return `<Link field={fields.${field.label}} />`;
               }
 
             default:
