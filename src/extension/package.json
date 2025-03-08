@@ -1,0 +1,59 @@
+{
+  "name": "sitecore-xm-cloud-components",
+  "displayName": "Sitecore XM Cloud Components",
+  "description": "Provides convenient snippets and commands for quickly scaffolding Sitecore XM Cloud components in React, with dynamic naming based on file names and TypeScript integration.",
+  "version": "0.0.5",
+  "engines": {
+    "vscode": "^1.86.0"
+  },
+  "publisher": "SebasAB",
+  "license": "MIT",
+  "icon": "assets/extension-logo.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SebasAB/sitecore-components"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:sitecore-xm-cloud-components.createSnippet"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "sitecore-xm-cloud-components.createSnippet",
+        "title": "Create Sitecore component"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "compile": "webpack",
+    "watch": "webpack --watch",
+    "package": "webpack --mode production --devtool hidden-source-map",
+    "compile-tests": "tsc -p . --outDir out",
+    "watch-tests": "tsc -p . -w --outDir out",
+    "pretest": "npm run compile-tests && npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.6",
+    "@types/node": "18.x",
+    "@types/vscode": "^1.86.0",
+    "@typescript-eslint/eslint-plugin": "^6.19.1",
+    "@typescript-eslint/parser": "^6.19.1",
+    "@vscode/test-cli": "^0.0.4",
+    "@vscode/test-electron": "^2.3.9",
+    "eslint": "^8.56.0",
+    "ts-loader": "^9.5.1",
+    "typescript": "^5.3.3",
+    "webpack": "^5.90.0",
+    "webpack-cli": "^5.1.4"
+  },
+  "dependencies": {
+    "openai": "^4.86.2"
+  }
+}
