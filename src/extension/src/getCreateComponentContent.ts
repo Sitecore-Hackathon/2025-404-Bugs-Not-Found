@@ -277,11 +277,19 @@ export async function getCreateComponentContent() {
             </div>
 
             <button class="create-component" onclick="createComponent()">Create Component</button>
+            <div id="status" class="status"></div>
         </div>
 
         <script>
             const vscode = acquireVsCodeApi();
             let fieldCount = 0;
+
+            function showStatus(message, isError = false) {
+                const status = document.getElementById('status');
+                status.textContent = message;
+                status.style.display = 'block';
+                status.className = 'status ' + (isError ? 'error' : 'success');
+            }
 
             function addField() {
                 const fieldsContainer = document.getElementById('fields');
@@ -376,7 +384,7 @@ export async function getCreateComponentContent() {
                 const chatGptOrganizationId = document.getElementById('chatGptOrganizationId').value;
                 
                 if (!componentName) {
-                    alert('Please enter a component name');
+                    showStatus('Please enter a component name', true);
                     return;
                 }
 
@@ -396,12 +404,12 @@ export async function getCreateComponentContent() {
                     : [];
 
                 if (fields.some(field => !field.label)) {
-                    alert('Please fill in all field names');
+                    showStatus('Please fill in all field names', true);
                     return;
                 }
 
                 if (hasPlaceholders === 'yes' && placeholders.some(p => !p.name || !p.key)) {
-                    alert('Please fill in all placeholder information');
+                    showStatus('Please fill in all placeholder information', true);
                     return;
                 }
 
