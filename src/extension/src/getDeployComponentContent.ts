@@ -165,8 +165,8 @@ export async function getDeployComponentContent(componentData: any) {
         <div class="section-title">Paths Configuration</div>
         <div class="form-group">
             <label for="templateParent">Template Parent ID</label>
-            <input required type="text" id="templateParent" value="{110D559F-DEA5-42EA-9C1C-8A5DF7E70EF9}" required>
-            <div class="help-text">Example: /sitecore/templates/Project/YourFolder</div>
+            <input required type="text" id="templateParent" value="" required>
+            <div class="help-text">Example: {110D559F-DEA5-42EA-9C1C-8A5DF7E70EF9}</div>
         </div>
         `
                 : ""
@@ -175,8 +175,8 @@ export async function getDeployComponentContent(componentData: any) {
         <div class="section-title">Rendering Configuration</div>
         <div class="form-group">
             <label for="renderingParent">Rendering Parent ID</label>
-            <input required type="text" id="renderingParent" value="{110D559F-DEA5-42EA-9C1C-8A5DF7E70EF9}" required>
-            <div class="help-text">Example: /sitecore/layout/Renderings/Project/YourFolder</div>
+            <input required type="text" id="renderingParent" value="" required>
+            <div class="help-text">Example: {110D559F-DEA5-42EA-9C1C-8A5DF7E70EF9}</div>
         </div>
 
         ${
@@ -187,8 +187,8 @@ export async function getDeployComponentContent(componentData: any) {
         <div class="section-title">Placeholder Configuration</div>
         <div class="form-group">
             <label for="placeholderParent">Placeholder Parent ID</label>
-            <input required type="text" id="placeholderParent" value="{110D559F-DEA5-42EA-9C1C-8A5DF7E70EF9}" required>
-            <div class="help-text">Example: /sitecore/layout/Placeholder Settings/Project/YourFolder</div>
+            <input required type="text" id="placeholderParent" value="" required>
+            <div class="help-text">Example: {110D559F-DEA5-42EA-9C1C-8A5DF7E70EF9}</div>
         </div>
         `
                 : ""
