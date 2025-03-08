@@ -93,11 +93,14 @@ This extension integrates with the following services:
     -   The extension relies on the Sitecore XM Cloud GraphQL endpoint to create templates and renderings.
     -   Ensure the endpoint is enabled and accessible within your XM Cloud instance.
 
-#### OpenAI
+#### OpenAI (Optional)
 
 -   **API Key**:
     -   An OpenAI API key is required to utilize OpenAI's code completion capabilities.
-    -   You will be prompted to provide this key when creating components.
+    -   You may include this key when creating components.
+-   **Organization Id**:
+    -   An Organization id may be required to utilize OpenAI's code completion capabilities.
+    -   You may include this id when creating components if your subscription requires it.
 
 #### Custom Modules
 
