@@ -284,7 +284,8 @@ function activate(context: { subscriptions: any[] }) {
                                 }));    
     
                                 const prompt = `
-                                Add styled-jsx styling to the following NextJS tsx component. Return only code with no explanation.
+                                Add styled-jsx styling to the following NextJS tsx component. Return only code with no explanation and
+                                if a placeholder html element is present, do not modify it.
                                 ${tsxCode}
                                 `;
                                 
