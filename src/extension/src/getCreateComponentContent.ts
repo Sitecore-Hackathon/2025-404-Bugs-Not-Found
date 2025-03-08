@@ -233,7 +233,7 @@ export async function getCreateComponentContent() {
             <div class="section-title">Basic Information</div>
             <div class="form-group">
                 <label for="componentName">Component Name</label>
-                <input type="text" id="componentName" placeholder="Enter component name" required>
+                <input required type="text" id="componentName" placeholder="Enter component name" required>
             </div>
 
             <div class="section-title">Component Configuration</div>
@@ -264,6 +264,12 @@ export async function getCreateComponentContent() {
             <div id="placeholderConfig" class="form-group" style="display: none;">
                 <div id="placeholders" class="fields-container"></div>
                 <button class="add-field" onclick="addPlaceholder()">+ Add Placeholder</button>
+            </div>
+
+            <div class="section-title">Style Component with AI (optional)</div>
+            <div class="form-group">
+                <label for="chatGptApiKey">ChatGPT Api Key</label>
+                <input type="text" id="chatGptApiKey" required placeholder="Enter your sitecore instance chatGPT api key">
             </div>
 
             <button class="create-component" onclick="createComponent()">Create Component</button>
@@ -362,6 +368,7 @@ export async function getCreateComponentContent() {
                 const componentName = document.getElementById('componentName').value;
                 const componentType = document.getElementById('componentType').value;
                 const hasPlaceholders = document.getElementById('hasPlaceholders').value;
+                const hasChatGptApiKey = document.getElementById('chatGptApiKey').value;
                 
                 if (!componentName) {
                     alert('Please enter a component name');
@@ -404,7 +411,8 @@ export async function getCreateComponentContent() {
                         componentType,
                         hasPlaceholders,
                         fields,
-                        placeholders
+                        placeholders,
+                        hasChatGptApiKey
                     }
                 });
             }

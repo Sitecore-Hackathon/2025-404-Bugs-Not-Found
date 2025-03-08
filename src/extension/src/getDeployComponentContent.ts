@@ -146,17 +146,17 @@ export async function getDeployComponentContent(componentData: any) {
                     <div class="section-title">Authentication</div>
                      <div class="form-group">
                         <label for="instanceUrl">Sitecore XM Cloud Instance Url</label>
-                        <input type="text" id="instanceUrl" required placeholder="Enter your sitecore instance url" value="https://xmcloudcm.localhost">
+                        <input required type="text" id="instanceUrl" required placeholder="Enter your sitecore instance url" value="https://xmcloudcm.localhost">
                     </div>
                     <div class="form-group">
                         <label for="accessToken">Sitecore XM Cloud Access Token</label>
-                        <input type="password" id="accessToken" required placeholder="Enter your access token">
+                        <input required type="password" id="accessToken" required placeholder="Enter your access token">
                     </div>
 
                     <div class="section-title">Component Details</div>
                     <div class="form-group">
                         <label for="templateName">Template Name</label>
-                        <input type="text" id="templateName" value="${
+                        <input required type="text" id="templateName" value="${
                             componentData.componentName
                         }" required>
                     </div>
@@ -164,14 +164,14 @@ export async function getDeployComponentContent(componentData: any) {
                     <div class="section-title">Paths Configuration</div>
                     <div class="form-group">
                         <label for="templateParent">Template Parent Path</label>
-                        <input type="text" id="templateParent" value="/sitecore/templates/Project" required>
+                        <input required type="text" id="templateParent" value="/sitecore/templates/Project" required>
                         <div class="help-text">Example: /sitecore/templates/Project/YourFolder</div>
                     </div>
 
                     <div class="section-title">Rendering Configuration</div>
                     <div class="form-group">
                         <label for="renderingParent">Rendering Parent Path</label>
-                        <input type="text" id="renderingParent" value="/sitecore/layout/Renderings/Project" required>
+                        <input required type="text" id="renderingParent" value="/sitecore/layout/Renderings/Project" required>
                         <div class="help-text">Example: /sitecore/layout/Renderings/Project/YourFolder</div>
                     </div>
 
@@ -183,7 +183,7 @@ export async function getDeployComponentContent(componentData: any) {
                     <div class="section-title">Placeholder Configuration</div>
                     <div class="form-group">
                         <label for="placeholderParent">Placeholder Parent Path</label>
-                        <input type="text" id="placeholderParent" value="/sitecore/layout/Placeholder Settings/Project" required>
+                        <input required type="text" id="placeholderParent" value="/sitecore/layout/Placeholder Settings/Project" required>
                         <div class="help-text">Example: /sitecore/layout/Placeholder Settings/Project/YourFolder</div>
                     </div>
                     `

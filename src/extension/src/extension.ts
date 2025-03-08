@@ -83,6 +83,7 @@ function activate(context: { subscriptions: any[] }) {
                             key: string;
                             type: string;
                         }>;
+                        hasChatGptApiKey: string;
                     };
                 }) => {
                     if (message.command === "createSnippet") {
@@ -92,6 +93,7 @@ function activate(context: { subscriptions: any[] }) {
                             hasPlaceholders,
                             fields,
                             placeholders,
+                            hasChatGptApiKey,
                         } = message.data;
                         const propsTypeName = `${componentName}Props`;
 
