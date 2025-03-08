@@ -276,39 +276,41 @@ function activate(context: { subscriptions: any[] }) {
                         };
                         ${returnSnippet}`
 
-                        if(!(chatGptApiKey === undefined || chatGptApiKey === null || chatGptApiKey === "" || chatGptOrganizationId === undefined || chatGptOrganizationId === null || chatGptOrganizationId === "")) {
-                            const openai = new OpenAI(({
-                                apiKey: chatGptApiKey,
-                                organization: chatGptOrganizationId,
-                            }));    
-
-                            const prompt = `
-                            Add styled-jsx styling to the following NextJS tsx component. Return only code with no explanation
-                            ${tsxCode}
-                            `;
-                            
-                            const completion = await openai.chat.completions.create({
-                            model: "o3-mini",
-                            reasoning_effort: "medium",
-                            messages: [
-                                {
-                                role: "user", 
-                                content: prompt
-                                }
-                            ],
-                            store: false,
-                            });
-
-                            tsxCode = completion.choices[0].message.content ?? tsxCode;
+                        if(!(chatGptApiKey === undefined || chatGptApiKey === null || chatGptApiKey === "")) {
+                            try {
+                                const openai = new OpenAI(({
+                                    apiKey: chatGptApiKey,
+                                    organization: chatGptOrganizationId,
+                                }));    
+    
+                                const prompt = `
+                                Add styled-jsx styling to the following NextJS tsx component. Return only code with no explanation.
+                                ${tsxCode}
+                                `;
+                                
+                                const completion = await openai.chat.completions.create({
+                                model: "o3-mini",
+                                reasoning_effort: "medium",
+                                messages: [
+                                    {
+                                    role: "user", 
+                                    content: prompt
+                                    }
+                                ],
+                                store: false,
+                                });
+    
+                                tsxCode = completion.choices[0].message.content ?? "";
+                            } catch (error) {
+                                panel.webview.postMessage({
+                                    command: "error",
+                                    message: "Failed to call chatgpt with issue: " + error,
+                                });
+                                return;
+                            }                         
                         }
 
                         const snippet = new vscode.SnippetString(tsxCode);
-                        snippet.appendText(tsxCode);
-
-                        /*const newFileUri = `${componentName}.tsx`
-                        await vscode.workspace.fs.writeFile(newFileUri, new TextEncoder().encode(snippet));
-                        vscode.window.showTextDocument(newFileUri, { preview: false });*/
-
                         const uri = vscode.Uri.file(editor.document.fileName);
                         const document =
                             await vscode.workspace.openTextDocument(uri);

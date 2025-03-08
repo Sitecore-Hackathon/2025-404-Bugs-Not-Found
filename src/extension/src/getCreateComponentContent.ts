@@ -220,6 +220,18 @@ export async function getCreateComponentContent() {
                 border-bottom: 1px solid var(--border-color);
             }
 
+            .success {
+                background-color: rgba(16, 124, 16, 0.1);
+                border: 1px solid var(--success-color);
+                color: #73C991;
+            }
+
+            .error {
+                background-color: rgba(232, 17, 35, 0.1);
+                border: 1px solid var(--error-color);
+                color: #F48771;
+            }
+
             @keyframes fadeIn {
                 from { opacity: 0; transform: translateY(-10px); }
                 to { opacity: 1; transform: translateY(0); }
@@ -276,12 +288,20 @@ export async function getCreateComponentContent() {
                 <input type="text" id="chatGptOrganizationId" required placeholder="Enter your chatGPT organization id">
             </div>
 
-            <button class="create-component" onclick="createComponent()">Create Component</button>
+            <button id="btnCreateComponent" class="create-component" onclick="createComponent()">Create Component</button>
+            <div id="status" class="status"></div>
         </div>
 
         <script>
             const vscode = acquireVsCodeApi();
             let fieldCount = 0;
+
+            function showStatus(message, isError = false) {
+                const status = document.getElementById('status');
+                status.textContent = message;
+                status.style.display = 'block';
+                status.className = 'status ' + (isError ? 'error' : 'success');
+            }
 
             function addField() {
                 const fieldsContainer = document.getElementById('fields');
@@ -376,7 +396,7 @@ export async function getCreateComponentContent() {
                 const chatGptOrganizationId = document.getElementById('chatGptOrganizationId').value;
                 
                 if (!componentName) {
-                    alert('Please enter a component name');
+                    showStatus('Please enter a component name', true);
                     return;
                 }
 
@@ -396,12 +416,12 @@ export async function getCreateComponentContent() {
                     : [];
 
                 if (fields.some(field => !field.label)) {
-                    alert('Please fill in all field names');
+                    showStatus('Please fill in all field names', true);
                     return;
                 }
 
                 if (hasPlaceholders === 'yes' && placeholders.some(p => !p.name || !p.key)) {
-                    alert('Please fill in all placeholder information');
+                    showStatus('Please fill in all placeholder information', true);
                     return;
                 }
 
@@ -447,6 +467,22 @@ export async function getCreateComponentContent() {
                 if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') {
                     const formGroup = e.target.closest('.form-group');
                     if (formGroup) formGroup.classList.remove('focused');
+                }
+            });
+
+             window.addEventListener('message', event => {
+                const message = event.data;
+                const button = document.getElementById('btnCreateComponent');
+                button.textContent = 'Create Component';
+                button.disabled = false;
+
+                switch (message.command) {
+                    case 'success':
+                        showStatus(message.message);
+                        break;
+                    case 'error':
+                        showStatus(message.message, true);
+                        break;
                 }
             });
         </script>
