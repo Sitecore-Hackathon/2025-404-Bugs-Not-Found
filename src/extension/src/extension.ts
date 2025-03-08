@@ -1,198 +1,121 @@
 const vscode = require("vscode");
+const fs = require('fs');
+const path = require('path');
 
 function activate(context: { subscriptions: any[] }) {
   let disposable = vscode.commands.registerCommand(
     "sitecore-xm-cloud-components.createSnippet",
     async function () {
       const editor = vscode.window.activeTextEditor;
-      const filename = editor.document.fileName.split(/[/\\]/).pop();
-      const componentName = filename.replace(/\.[^/.]+$/, "");
-      const propsTypeName = `${componentName}Props`;
-
-      // Ask the first question about component type
-      const componentType = await vscode.window.showQuickPick(
-        [
-          { label: "With Datasource Check", value: "withDatasourceCheck" },
-          { label: "With Datasource Rendering", value: "withDatasourceRendering" },
-          { label: "Default", value: "default" },
-        ],
-        { placeHolder: "Select the component return type", canPickMany: false }
-      );
-      if (!componentType) return; // User cancelled the input
-
-      // Ask the second question about placeholder
-      const placeholderType = await vscode.window.showQuickPick(
-        [
-          { label: "Placeholder", value: "placeholder" },
-          { label: "Dynamic Placeholder", value: "dynamicPlaceholder" },
-          { label: "None", value: "default" },
-        ],
-        { placeHolder: "Select the placeholder type", canPickMany: false }
-      );
-      if (!placeholderType) return; // User cancelled the input
-
-      // Ask the user to input custom fields
-      const fields: Array<{ label: string; value: string; isRequired: boolean }> = [];
-      let addMoreFields = true;
-
-      while (addMoreFields) {
-        const fieldName = await vscode.window.showInputBox({
-          placeHolder: "Enter the field name (e.g., heading, copy, image, link)",
-        });
-        if (!fieldName) break; // User cancelled the input
-
-        const fieldType = await vscode.window.showQuickPick(
-          [
-            { label: "Text", value: "Field<string>" },
-            { label: "Image", value: "ImageField" },
-            { label: "Link", value: "LinkField" },
-          ],
-          { placeHolder: "Select the field type", canPickMany: false }
-        );
-        if (!fieldType) break; // User cancelled the input
-
-        const isRequired = await vscode.window.showQuickPick(
-          [
-            { label: "Yes", value: true },
-            { label: "No", value: false },
-          ],
-          { placeHolder: `Is ${fieldName} required?`, canPickMany: false }
-        );
-        if (!isRequired) break; // User cancelled the input
-
-        fields.push({ label: fieldName, value: fieldType.value, isRequired: isRequired.value });
-
-        const addMore = await vscode.window.showQuickPick(
-          [
-            { label: "Yes", value: true },
-            { label: "No", value: false },
-          ],
-          { placeHolder: "Do you want to add more fields?", canPickMany: false }
-        );
-        if (!addMore || !addMore.value) addMoreFields = false;
-      }
-
-      // return value snippet
-      let returnSnippet: string;
-
-      // fields types import (e.g: Field, ImageField, LinkField)
-      let fieldsTypesImports: Array<string> = [];
-
-      // fields import (e.g: Text, RichText, Image, Link)
-      let fieldsImports: Array<string> = [];
-
-      switch (componentType.value) {
-        case "withDatasourceCheck":
-          returnSnippet = `export default withDatasourceCheck()<${propsTypeName}>(${componentName});`;
-          break;
-
-        case "withDatasourceRendering":
-          returnSnippet = `export default withDatasourceRendering()<${propsTypeName}>(${componentName});`;
-          break;
-
-        default:
-          returnSnippet = `export default ${componentName};`;
-      }
-
-      fields.forEach((field) => {
-        switch (field.value) {
-          case "Field<string>":
-            !fieldsTypesImports.includes("Field") && fieldsTypesImports.push("Field");
-            !fieldsImports.includes("Text") && fieldsImports.push("Text");
-            break;
-
-          case "ImageField":
-            !fieldsTypesImports.includes("ImageField") && fieldsTypesImports.push("ImageField");
-            !fieldsImports.includes("Image") && fieldsImports.push("Image");
-            break;
-
-          case "LinkField":
-            !fieldsTypesImports.includes("LinkField") && fieldsTypesImports.push("LinkField");
-            !fieldsImports.includes("Link") && fieldsImports.push("Link");
-            break;
-
-          default:
-            fieldsTypesImports.push("");
+      const panel = vscode.window.createWebviewPanel(
+        "createSnippet",
+        "Create Snippet",
+        vscode.ViewColumn.One,
+        {
+          enableScripts: true,
         }
-      });
+      );
 
-      switch (placeholderType.value) {
-        case "placeholder":
-        case "dynamicPlaceholder":
-          !fieldsTypesImports.includes("Placeholder") && fieldsTypesImports.push("Placeholder");
-          break;
+      panel.webview.html = await getWebviewContent();
 
-        default:
-          break;
-      }
+      panel.webview.onDidReceiveMessage(
+        async (message: { command: string; data: { componentName: any; componentType: any; placeholderType: any; fields: any; }; }) => {
+          if (message.command === "createSnippet") {
+            const { componentName, componentType, placeholderType, fields } = message.data;
+            const propsTypeName = `${componentName}Props`;
 
-      const typesImports = fieldsTypesImports.join(", ");
-      const fieldImports = fieldsImports.join(", ");
+            let returnSnippet;
+            let fieldsTypesImports: string[] = [];
+            let fieldsImports: string[] = [];
 
-      const interfaceFields: string[] = [];
+            switch (componentType) {
+              case "withDatasourceCheck":
+                returnSnippet = `export default withDatasourceCheck()<${propsTypeName}>(${componentName});`;
+                break;
+              case "withDatasourceRendering":
+                returnSnippet = `export default withDatasourceRendering()<${propsTypeName}>(${componentName});`;
+                break;
+              default:
+                returnSnippet = `export default ${componentName};`;
+            }
 
-      fields.forEach((field) => {
-        interfaceFields.push(`${field.label}: ${field.value};`);
-      });
-
-      const interfaceFieldsString = interfaceFields.join("\n    ");
-
-      const fieldsMarkup = fields
-        .map((field) => {
-          switch (field.value) {
-            case "Field<string>":
-              if (!field.isRequired) {
-                return `{fields.${field.label} && fields.${field.label}.value && (<Text field={fields.${field.label}}/>)}`;
-              } else {
-                return `<Text field={fields.${field.label}} />`;
+            fields.forEach((field: { value: any; }) => {
+              switch (field.value) {
+                case "Field<string>":
+                  !fieldsTypesImports.includes("Field") && fieldsTypesImports.push("Field");
+                  !fieldsImports.includes("Text") && fieldsImports.push("Text");
+                  break;
+                case "ImageField":
+                  !fieldsTypesImports.includes("ImageField") && fieldsTypesImports.push("ImageField");
+                  !fieldsImports.includes("Image") && fieldsImports.push("Image");
+                  break;
+                case "LinkField":
+                  !fieldsTypesImports.includes("LinkField") && fieldsTypesImports.push("LinkField");
+                  !fieldsImports.includes("Link") && fieldsImports.push("Link");
+                  break;
+                default:
+                  fieldsTypesImports.push("");
               }
+            });
 
-            case "ImageField":
-              if (!field.isRequired) {
-                return `{fields.${field.label} && fields.${field.label}.src && (<Image field={fields.${field.label}}/>)}`;
-              } else {
-                return `<Image field={fields.${field.label}} />`;
-              }
+            switch (placeholderType) {
+              case "placeholder":
+              case "dynamicPlaceholder":
+                !fieldsTypesImports.includes("Placeholder") && fieldsTypesImports.push("Placeholder");
+                break;
+              default:
+                break;
+            }
 
-            case "LinkField":
-              if (!field.isRequired) {
-                return `{fields.${field.label} && fields.${field.label}.href && (<Link field={fields.${field.label}}/>)}`;
-              } else {
-                return `<Link field={fields.${field.label}} />`;
-              }
+            const typesImports = fieldsTypesImports.join(", ");
+            const fieldImports = fieldsImports.join(", ");
 
-            default:
-              return "";
-          }
-        })
-        .join("\n            ");
+            const interfaceFields = fields.map((field: { label: any; value: any; }) => `${field.label}: ${field.value};`).join("\n    ");
 
-      let placeholderMarkup = "";
+            const fieldsMarkup = fields
+              .map((field: { value: any; isRequired: any; label: any; }) => {
+                switch (field.value) {
+                  case "Field<string>":
+                    return field.isRequired
+                      ? `<Text field={fields.${field.label}} />`
+                      : `{fields.${field.label} && fields.${field.label}.value && (<Text field={fields.${field.label}}/>)}`;
+                  case "ImageField":
+                    return field.isRequired
+                      ? `<Image field={fields.${field.label}} />`
+                      : `{fields.${field.label} && fields.${field.label}.src && (<Image field={fields.${field.label}}/>)}`;
+                  case "LinkField":
+                    return field.isRequired
+                      ? `<Link field={fields.${field.label}} />`
+                      : `{fields.${field.label} && fields.${field.label}.href && (<Link field={fields.${field.label}}/>)}`;
+                  default:
+                    return "";
+                }
+              })
+              .join("\n            ");
 
-      switch (placeholderType.value) {
-        case "placeholder":
-          placeholderMarkup = `<Placeholder name="" />`;
-          break;
+            let placeholderMarkup = "";
+            switch (placeholderType) {
+              case "placeholder":
+                placeholderMarkup = `<Placeholder name="" />`;
+                break;
+              case "dynamicPlaceholder":
+                placeholderMarkup = `<Placeholder name={\`-\${params.DynamicPlaceholderId}\`} rendering={rendering} />`;
+                break;
+              default:
+                break;
+            }
 
-        case "dynamicPlaceholder":
-          placeholderMarkup = `<Placeholder name={\`-\${params.DynamicPlaceholderId}\`} rendering={rendering} />`;
-          break;
-
-        default:
-          break;
-      }
-
-      const snippet = new vscode.SnippetString();
-      snippet.appendText(`import { ${typesImports}, ${fieldImports} } from '@sitecore-jss/sitecore-jss-nextjs';
+            const snippet = new vscode.SnippetString();
+            snippet.appendText(`import { ${typesImports}, ${fieldImports} } from '@sitecore-jss/sitecore-jss-nextjs';
 import { ComponentProps } from 'lib/component-props';
 ${
-  componentType.value === "withDatasourceRendering"
+  componentType === "withDatasourceRendering"
     ? "import { withDatasourceRendering } from '@constellation4sitecore/foundation-enhancers';"
     : ""
 }
 
 interface Fields {
-    ${interfaceFieldsString}
+    ${interfaceFields}
 }
 
 type ${propsTypeName} = ComponentProps & {
@@ -200,8 +123,8 @@ type ${propsTypeName} = ComponentProps & {
 };
 
 const ${componentName} = ({ fields, params, ${
-        placeholderMarkup && `rendering`
-      } }: ${propsTypeName}) => {
+              placeholderMarkup && `rendering`
+            } }: ${propsTypeName}) => {
   ${placeholderMarkup && "const id = params.RenderingIdentifier;"}
     return (
         <section className={params.styles} ${
@@ -213,12 +136,31 @@ const ${componentName} = ({ fields, params, ${
     );
 };
 ${returnSnippet}`);
-
-      editor.insertSnippet(snippet);
+            const uri = vscode.Uri.file(editor.document.fileName);
+            const document = await vscode.workspace.openTextDocument(uri);
+            const editorInstance = await vscode.window.showTextDocument(document, vscode.ViewColumn.One);
+            editorInstance.insertSnippet(snippet);
+          }
+        },
+        undefined,
+        context.subscriptions
+      );
     }
   );
 
   context.subscriptions.push(disposable);
+}
+
+async function getWebviewContent() {
+  const filePath = path.join(__dirname, 'webview.html'); 
+
+  try {
+    const html = await fs.promises.readFile(filePath, 'utf8');
+    return `${html}`;
+  } catch (error) {
+    console.error('Error reading the HTML file:', error);
+    return '';
+  }
 }
 
 function deactivate() {}
