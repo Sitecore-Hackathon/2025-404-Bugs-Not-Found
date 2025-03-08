@@ -5,8 +5,6 @@
 -   MUST READ: **[Submission requirements](SUBMISSION_REQUIREMENTS.md)**
 -   [Entry form template](ENTRYFORM.md)
 
-# Hackathon Submission Entry form
-
 ## Team name
 
 **404 Bugs Not Found**
@@ -63,9 +61,7 @@ By automating the component creation process and providing centralized state man
 
 ## Video link
 
-⟹ Provide a video highlighing your Hackathon module submission and provide a link to the video. You can use any video hosting, file share or even upload the video to this repository. _Just remember to update the link below_
-
-⟹ [Replace this Video link](#video-link)
+[Replace this Video link](#video-link)
 
 ## Pre-requisites and Dependencies
 
@@ -80,15 +76,41 @@ By automating the component creation process and providing centralized state man
 -   **Path (`path`)**:
     -   Used for handling and transforming file paths.
     -   Install: `npm install path`
+-   **OpenAI (`openai`)**:
+    -   Used to interact with the OpenAI API for generating code completions.
+    -   Install: `npm install openai`
 
 ### Services
 
-1.  **Sitecore XM Cloud**:
-    -   The extension interacts with Sitecore XM Cloud for component deployment.
-    -   Ensure the Sitecore XM Cloud service is properly configured and accessible.
-2.  **GraphQL API**:
-    -   The extension sends GraphQL requests to the Sitecore XM Cloud instance.
-    -   Ensure the GraphQL endpoint is enabled and accessible.
+This extension integrates with the following services:
+
+#### Sitecore XM Cloud
+
+-   **Access Token**:
+    -   A valid Sitecore XM Cloud access token is required for authentication during component deployment.
+    -   The token must have sufficient permissions to create templates and renderings.
+-   **GraphQL Endpoint**:
+    -   The extension relies on the Sitecore XM Cloud GraphQL endpoint to create templates and renderings.
+    -   Ensure the endpoint is enabled and accessible within your XM Cloud instance.
+
+#### OpenAI
+
+-   **API Key**:
+    -   An OpenAI API key is required to utilize OpenAI's code completion capabilities.
+    -   You will be prompted to provide this key when creating components.
+
+#### Custom Modules
+
+This extension utilizes the following custom modules to manage WebView content:
+
+-   **`getCreateComponentContent`**:
+
+    -   Provides the HTML content for the WebView used to create new components.
+    -   Import: `import { getCreateComponentContent } from "./getCreateComponentContent";`
+
+-   **`getDeployComponentContent`**:
+    -   Provides the HTML content for the WebView used to deploy components to Sitecore XM Cloud.
+    -   Import: `import { getDeployComponentContent } from "./getDeployComponentContent";`
 
 ### Configuration
 
@@ -182,7 +204,14 @@ Before installing this extension, ensure you have the following installed:
         -   `With Datasource Check`
         -   `With Datasource Rendering`
     -   **Include Placeholders**: Choose `Yes` or `No`.
-4.  **Configure Fields**:
+4.  **Configure Placeholders (if applicable)**:
+    -   If `Include Placeholders` is `Yes`, click `+ Add Placeholder`.
+    -   For each placeholder:
+        -   Enter the placeholder name.
+        -   Enter the placeholder key.
+        -   Select the placeholder type: `Static` or `Dynamic`.
+    -   Repeat to add more placeholders.
+5.  **Configure Fields**:
     -   Click `+ Add Field`.
     -   For each field:
         -   Enter the field name.
@@ -195,14 +224,10 @@ Before installing this extension, ensure you have the following installed:
             -   `Multiline Text`
         -   Specify if the field is required.
     -   Repeat to add more fields.
-5.  **Configure Placeholders (if applicable)**:
-    -   If `Include Placeholders` is `Yes`, click `+ Add Placeholder`.
-    -   For each placeholder:
-        -   Enter the placeholder name.
-        -   Enter the placeholder key.
-        -   Select the placeholder type: `Static` or `Dynamic`.
-    -   Repeat to add more placeholders.
-6.  **Create the Component**:
+6.  **Style Component with AI (optional)**:
+    -   Obtain an API key and Organization Id from OpenAI to utilize their API.
+    -   The extension generates component styling.
+7.  **Create the Component**:
     -   Click `Create Component`.
     -   The extension generates TypeScript code and inserts it into the active editor.
 
@@ -230,5 +255,3 @@ Before installing this extension, ensure you have the following installed:
 ![Validation of created items in Sitecore](docs/images/validation-of-created-items.gif?raw=true "Validation of created items in Sitecore")
 
 ## Comments
-
-If you'd like to make additional comments that is important for your module entry.
