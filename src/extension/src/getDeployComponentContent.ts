@@ -165,7 +165,7 @@ export async function getDeployComponentContent(componentData: any) {
         <div class="section-title">Paths Configuration</div>
         <div class="form-group">
             <label for="templateParent">Template Parent Path</label>
-            <input required type="text" id="templateParent" value="/sitecore/templates/Project" required>
+            <input required type="text" id="templateParent" value="{/sitecore/templates/Project}" required>
             <div class="help-text">Example: /sitecore/templates/Project/YourFolder</div>
         </div>
         `

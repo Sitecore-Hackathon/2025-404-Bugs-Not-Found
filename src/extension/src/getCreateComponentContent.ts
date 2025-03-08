@@ -281,11 +281,11 @@ export async function getCreateComponentContent() {
             <div class="section-title">Style Component with AI (optional)</div>
             <div class="form-group">
                 <label for="chatGptApiKey">ChatGPT Api Key</label>
-                <input type="text" id="chatGptApiKey" required placeholder="Enter your chatGPT api key">
+                <input type="password" id="chatGptApiKey" required placeholder="Enter your chatGPT api key">
             </div>
               <div class="form-group">
                 <label for="chatGptOrganizationId">ChatGPT Organization Id</label>
-                <input type="text" id="chatGptOrganizationId" required placeholder="Enter your chatGPT organization id">
+                <input type="password" id="chatGptOrganizationId" required placeholder="Enter your chatGPT organization id">
             </div>
 
             <button id="btnCreateComponent" class="create-component" onclick="createComponent()">Create Component</button>
