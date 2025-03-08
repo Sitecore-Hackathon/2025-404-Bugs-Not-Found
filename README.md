@@ -61,7 +61,7 @@ By automating the component creation process and providing centralized state man
 
 ## Video link
 
-[Video Demo](https://youtu.be/sktlpb_f_Lc)
+[Video Demo](https://youtu.be/Ldo1iApuujI)
 
 ## Pre-requisites and Dependencies
 
