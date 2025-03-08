@@ -8,11 +8,16 @@ class ComponentStateManager {
     private componentData: {
         componentName?: string;
         componentType?: string;
-        placeholderType?: string;
+        hasPlaceholders?: string;
         fields?: Array<{
             label: string;
             value: string;
             isRequired: boolean;
+        }>;
+        placeholders?: Array<{
+            name: string;
+            key: string;
+            type: string;
         }>;
     } = {};
 
@@ -64,11 +69,16 @@ function activate(context: { subscriptions: any[] }) {
                     data: {
                         componentName: string;
                         componentType: string;
-                        placeholderType: string;
+                        hasPlaceholders: string;
                         fields: Array<{
                             label: string;
                             value: string;
                             isRequired: boolean;
+                        }>;
+                        placeholders?: Array<{
+                            name: string;
+                            key: string;
+                            type: string;
                         }>;
                     };
                 }) => {
@@ -76,8 +86,9 @@ function activate(context: { subscriptions: any[] }) {
                         const {
                             componentName,
                             componentType,
-                            placeholderType,
+                            hasPlaceholders,
                             fields,
+                            placeholders,
                         } = message.data;
                         const propsTypeName = `${componentName}Props`;
 
@@ -98,18 +109,25 @@ function activate(context: { subscriptions: any[] }) {
 
                         fields.forEach((field: { value: any }) => {
                             switch (field.value) {
-                                case "Field<string>":
+                                case "SingleLineText":
+                                case "MultilineText":
                                     !fieldsTypesImports.includes("Field") &&
                                         fieldsTypesImports.push("Field");
                                     !fieldsImports.includes("Text") &&
                                         fieldsImports.push("Text");
                                     break;
+                                case "RichText":
+                                    !fieldsTypesImports.includes("Field") &&
+                                        fieldsTypesImports.push("Field");
+                                    !fieldsImports.includes("RichText") &&
+                                        fieldsImports.push("RichText");
+                                    break;
                                 case "ImageField":
                                     !fieldsTypesImports.includes(
                                         "ImageField"
                                     ) && fieldsTypesImports.push("ImageField");
-                                    !fieldsImports.includes("Image") &&
-                                        fieldsImports.push("Image");
+                                    !fieldsImports.includes("NextImage") &&
+                                        fieldsImports.push("NextImage");
                                     break;
                                 case "LinkField":
                                     !fieldsTypesImports.includes("LinkField") &&
@@ -117,29 +135,40 @@ function activate(context: { subscriptions: any[] }) {
                                     !fieldsImports.includes("Link") &&
                                         fieldsImports.push("Link");
                                     break;
+                                case "Checkbox":
+                                    !fieldsTypesImports.includes("Field") &&
+                                        fieldsTypesImports.push("Field");
+                                    break;
                                 default:
                                     fieldsTypesImports.push("");
                             }
                         });
 
-                        switch (placeholderType) {
-                            case "placeholder":
-                            case "dynamicPlaceholder":
-                                !fieldsTypesImports.includes("Placeholder") &&
-                                    fieldsTypesImports.push("Placeholder");
-                                break;
-                            default:
-                                break;
+                        if (hasPlaceholders === "yes") {
+                            !fieldsTypesImports.includes("Placeholder") &&
+                                fieldsTypesImports.push("Placeholder");
                         }
 
                         const typesImports = fieldsTypesImports.join(", ");
                         const fieldImports = fieldsImports.join(", ");
 
                         const interfaceFields = fields
-                            .map(
-                                (field: { label: any; value: any }) =>
-                                    `${field.label}: ${field.value};`
-                            )
+                            .map((field: { label: any; value: any }) => {
+                                let fieldType;
+                                switch (field.value) {
+                                    case "SingleLineText":
+                                    case "MultilineText":
+                                    case "RichText":
+                                        fieldType = "Field<string>";
+                                        break;
+                                    case "Checkbox":
+                                        fieldType = "Field<boolean>";
+                                        break;
+                                    default:
+                                        fieldType = field.value;
+                                }
+                                return `${field.label}: ${fieldType};`;
+                            })
                             .join("\n    ");
 
                         const fieldsMarkup = fields
@@ -149,19 +178,31 @@ function activate(context: { subscriptions: any[] }) {
                                     isRequired: any;
                                     label: any;
                                 }) => {
+                                    const fieldCheck = field.isRequired
+                                        ? ""
+                                        : `fields.${field.label} && `;
                                     switch (field.value) {
-                                        case "Field<string>":
+                                        case "SingleLineText":
+                                        case "MultilineText":
                                             return field.isRequired
                                                 ? `<Text field={fields.${field.label}} />`
-                                                : `{fields.${field.label} && fields.${field.label}.value && (<Text field={fields.${field.label}}/>)}`;
+                                                : `{${fieldCheck}fields.${field.label}.value && (<Text field={fields.${field.label}}/>)}`;
+                                        case "RichText":
+                                            return field.isRequired
+                                                ? `<RichText field={fields.${field.label}} />`
+                                                : `{${fieldCheck}fields.${field.label}.value && (<RichText field={fields.${field.label}}/>)}`;
                                         case "ImageField":
                                             return field.isRequired
-                                                ? `<Image field={fields.${field.label}} />`
-                                                : `{fields.${field.label} && fields.${field.label}.src && (<Image field={fields.${field.label}}/>)}`;
+                                                ? `<NextImage field={fields.${field.label}} />`
+                                                : `{${fieldCheck}fields.${field.label}.src && (<NextImage field={fields.${field.label}}/>)}`;
                                         case "LinkField":
                                             return field.isRequired
                                                 ? `<Link field={fields.${field.label}} />`
-                                                : `{fields.${field.label} && fields.${field.label}.href && (<Link field={fields.${field.label}}/>)}`;
+                                                : `{${fieldCheck}fields.${field.label}.href && (<Link field={fields.${field.label}}/>)}`;
+                                        case "Checkbox":
+                                            return field.isRequired
+                                                ? `{fields.${field.label}.value}`
+                                                : `{${fieldCheck}fields.${field.label}.value}`;
                                         default:
                                             return "";
                                     }
@@ -170,15 +211,30 @@ function activate(context: { subscriptions: any[] }) {
                             .join("\n            ");
 
                         let placeholderMarkup = "";
-                        switch (placeholderType) {
-                            case "placeholder":
-                                placeholderMarkup = `<Placeholder name="" />`;
-                                break;
-                            case "dynamicPlaceholder":
-                                placeholderMarkup = `<Placeholder name={\`-\${params.DynamicPlaceholderId}\`} rendering={rendering} />`;
-                                break;
-                            default:
-                                break;
+                        if (
+                            hasPlaceholders === "yes" &&
+                            placeholders &&
+                            placeholders.length > 0
+                        ) {
+                            placeholderMarkup = placeholders
+                                .map(
+                                    (p: {
+                                        type: string;
+                                        name: string;
+                                        key: string;
+                                    }) => {
+                                        const placeholderKey =
+                                            p.type === "dynamic"
+                                                ? p.key
+                                                : p.key.replace("-{*}", "");
+                                        return `<Placeholder name="${placeholderKey}" ${
+                                            p.type === "dynamic"
+                                                ? "rendering={rendering}"
+                                                : ""
+                                        } />`;
+                                    }
+                                )
+                                .join("\n            ");
                         }
 
                         const snippet = new vscode.SnippetString();
@@ -420,7 +476,9 @@ ${returnSnippet}`);
                     <div class="section-title">Component Details</div>
                     <div class="form-group">
                         <label for="templateName">Template Name</label>
-                        <input type="text" id="templateName" value="${componentData.componentName}" required>
+                        <input type="text" id="templateName" value="${
+                            componentData.componentName
+                        }" required>
                     </div>
 
                     <div class="section-title">Paths Configuration</div>
@@ -436,6 +494,21 @@ ${returnSnippet}`);
                         <input type="text" id="renderingParent" value="/sitecore/layout/Renderings/Project" required>
                         <div class="help-text">Example: /sitecore/layout/Renderings/Project/YourFolder</div>
                     </div>
+
+                    ${
+                        componentData.hasPlaceholders === "yes" &&
+                        componentData.placeholders &&
+                        componentData.placeholders.length > 0
+                            ? `
+                    <div class="section-title">Placeholder Configuration</div>
+                    <div class="form-group">
+                        <label for="placeholderParent">Placeholder Parent Path</label>
+                        <input type="text" id="placeholderParent" value="/sitecore/layout/Placeholder Settings/Project" required>
+                        <div class="help-text">Example: /sitecore/layout/Placeholder Settings/Project/YourFolder</div>
+                    </div>
+                    `
+                            : ""
+                    }
 
                     <button onclick="deployTemplate()">Create Template & Rendering</button>
                     <div id="status" class="status"></div>
@@ -456,8 +529,15 @@ ${returnSnippet}`);
                         const templateName = document.getElementById('templateName').value;
                         const templateParent = document.getElementById('templateParent').value;
                         const renderingParent = document.getElementById('renderingParent').value;
+                        const placeholderParent = document.getElementById('placeholderParent')?.value;
                         
-                        if (!accessToken || !templateName || !templateParent || !renderingParent) {
+                        if (!accessToken || !templateName || !templateParent || !renderingParent || ${
+                            componentData.hasPlaceholders === "yes" &&
+                            componentData.placeholders &&
+                            componentData.placeholders.length > 0
+                                ? "!placeholderParent"
+                                : "false"
+                        }) {
                             showStatus('Please fill in all required fields', true);
                             return;
                         }
@@ -473,7 +553,8 @@ ${returnSnippet}`);
                                 accessToken,
                                 templateName,
                                 templateParent,
-                                renderingParent
+                                renderingParent,
+                                placeholderParent
                             }
                         });
                     }
@@ -515,6 +596,7 @@ ${returnSnippet}`);
                         templateName: string;
                         templateParent: string;
                         renderingParent: string;
+                        placeholderParent?: string;
                     };
                 }) => {
                     if (message.command === "deployTemplate") {
@@ -524,6 +606,7 @@ ${returnSnippet}`);
                                 templateName,
                                 templateParent,
                                 renderingParent,
+                                placeholderParent,
                             } = message.data;
 
                             // We already checked for componentData.fields earlier
@@ -531,10 +614,15 @@ ${returnSnippet}`);
                                 (field) => ({
                                     name: field.label,
                                     type:
-                                        field.value === "Field<string>"
+                                        field.value === "SingleLineText" ||
+                                        field.value === "MultilineText"
                                             ? "Single-Line Text"
+                                            : field.value === "RichText"
+                                            ? "Rich Text"
                                             : field.value === "ImageField"
                                             ? "Image"
+                                            : field.value === "Checkbox"
+                                            ? "Checkbox"
                                             : "General Link",
                                 })
                             );
@@ -550,13 +638,14 @@ ${returnSnippet}`);
                                         input: {
                                             name: "${templateName}",
                                             parent: "${templateParent}",
+                                            createStandardValuesItem: true,
                                             sections: {
                                                 name: "Data",
                                                 fields: [
                                                     ${fieldsJson
                                                         .map(
                                                             (field) =>
-                                                                `{ name: "${field.name}", type: "${field.type}" }`
+                                                                `{ name: "${field.name}", type: "${field.type}", defaultValue: "$name" }`
                                                         )
                                                         .join(",\n")}
                                                 ]
@@ -565,6 +654,7 @@ ${returnSnippet}`);
                                     ) {
                                         itemTemplate {
                                             name
+                                            templateId
                                         }
                                     }
                                 }`;
@@ -594,6 +684,7 @@ ${returnSnippet}`);
                                     createItemTemplate?: {
                                         itemTemplate?: {
                                             name: string;
+                                            templateId: string;
                                         };
                                     };
                                 };
@@ -610,7 +701,99 @@ ${returnSnippet}`);
                                 result.data?.createItemTemplate?.itemTemplate
                                     ?.name
                             ) {
-                                // After template is created, create the rendering item
+                                const templateId =
+                                    result.data.createItemTemplate.itemTemplate
+                                        .templateId;
+                                let placeholderIds: string[] = [];
+
+                                // Create placeholders if they exist
+                                if (
+                                    componentData.hasPlaceholders === "yes" &&
+                                    componentData.placeholders &&
+                                    componentData.placeholders.length > 0 &&
+                                    placeholderParent
+                                ) {
+                                    console.log(
+                                        "Creating placeholders:",
+                                        componentData.placeholders
+                                    );
+
+                                    for (const placeholder of componentData.placeholders) {
+                                        const placeholderQuery = `
+                                            mutation {
+                                                createItem(
+                                                    input: {
+                                                        name: "${placeholder.name}",
+                                                        templateId: "{5C547D4E-7111-4995-95B0-6B561751BF2E}",
+                                                        parent: "${placeholderParent}",
+                                                        language: "en",
+                                                        fields: [
+                                                            { name: "Placeholder Key", value: "${placeholder.key}" }
+                                                        ]
+                                                    }
+                                                ) {
+                                                    item {
+                                                        itemId
+                                                        name
+                                                        path
+                                                    }
+                                                }
+                                            }`;
+
+                                        try {
+                                            const placeholderResponse =
+                                                await fetch(
+                                                    "https://xmcloudcm.localhost/sitecore/api/authoring/graphql/v1",
+                                                    {
+                                                        method: "POST",
+                                                        headers: {
+                                                            "Content-Type":
+                                                                "application/json",
+                                                            Authorization: `Bearer ${accessToken}`,
+                                                            "X-GQL-Token":
+                                                                accessToken,
+                                                        },
+                                                        body: JSON.stringify({
+                                                            query: placeholderQuery,
+                                                        }),
+                                                    }
+                                                );
+
+                                            const placeholderResult =
+                                                (await placeholderResponse.json()) as {
+                                                    data?: {
+                                                        createItem?: {
+                                                            item?: {
+                                                                itemId: string;
+                                                                name: string;
+                                                                path: string;
+                                                            };
+                                                        };
+                                                    };
+                                                    errors?: Array<{
+                                                        message: string;
+                                                    }>;
+                                                };
+
+                                            if (
+                                                placeholderResult.data
+                                                    ?.createItem?.item?.itemId
+                                            ) {
+                                                placeholderIds.push(
+                                                    placeholderResult.data
+                                                        .createItem.item.itemId
+                                                );
+                                            }
+                                        } catch (error) {
+                                            console.error(
+                                                `Error creating placeholder ${placeholder.name}:`,
+                                                error
+                                            );
+                                        }
+                                    }
+                                }
+
+                                // After template and placeholders are created, create the rendering item
                                 const renderingQuery = `
                                     mutation {
                                         createItem(
@@ -621,6 +804,15 @@ ${returnSnippet}`);
                                                 language: "en",
                                                 fields: [
                                                     { name: "componentName", value: "${templateName}" }
+                                                    ${
+                                                        placeholderIds.length >
+                                                        0
+                                                            ? `,
+                                                    { name: "Placeholders", value: "${placeholderIds.join(
+                                                        "|"
+                                                    )}" }`
+                                                            : ""
+                                                    }
                                                 ]
                                             }
                                         ) {
@@ -677,11 +869,6 @@ ${returnSnippet}`);
                                     errors?: Array<{ message: string }>;
                                 };
 
-                                console.log(
-                                    "Parsed rendering response:",
-                                    renderingResult
-                                );
-
                                 if (renderingResult.errors) {
                                     throw new Error(
                                         renderingResult.errors[0].message
@@ -694,14 +881,16 @@ ${returnSnippet}`);
                                 ) {
                                     panel.webview.postMessage({
                                         command: "success",
-                                        message:
-                                            "Template and rendering created successfully!",
+                                        message: `${
+                                            placeholderIds.length > 0
+                                                ? "Placeholders and "
+                                                : ""
+                                        }rendering created successfully!`,
                                     });
                                 } else {
                                     panel.webview.postMessage({
                                         command: "error",
-                                        message:
-                                            "Template created but failed to create rendering",
+                                        message: "Failed to create rendering",
                                     });
                                 }
                             } else {
@@ -981,11 +1170,10 @@ async function getWebviewContent() {
             </div>
 
             <div class="form-group">
-                <label for="placeholderType">Placeholder Type</label>
-                <select id="placeholderType">
-                    <option value="none">None</option>
-                    <option value="placeholder">Static Placeholder</option>
-                    <option value="dynamicPlaceholder">Dynamic Placeholder</option>
+                <label for="hasPlaceholders">Include Placeholders</label>
+                <select id="hasPlaceholders">
+                    <option value="no">No</option>
+                    <option value="yes">Yes</option>
                 </select>
             </div>
 
@@ -993,6 +1181,12 @@ async function getWebviewContent() {
             <div class="form-group">
                 <div id="fields" class="fields-container"></div>
                 <button class="add-field" onclick="addField()">+ Add Field</button>
+            </div>
+
+            <div id="placeholderSection" class="section-title" style="display: none;">Placeholder Configuration</div>
+            <div id="placeholderConfig" class="form-group" style="display: none;">
+                <div id="placeholders" class="fields-container"></div>
+                <button class="add-field" onclick="addPlaceholder()">+ Add Placeholder</button>
             </div>
 
             <button class="create-component" onclick="createComponent()">Create Component</button>
@@ -1009,9 +1203,12 @@ async function getWebviewContent() {
                 fieldRow.innerHTML = \`
                     <input type="text" placeholder="Field name" required>
                     <select>
-                        <option value="Field<string>">Text Field</option>
-                        <option value="ImageField">Image Field</option>
+                        <option value="SingleLineText">Single Line Text</option>
+                        <option value="RichText">Rich Text Field</option>
                         <option value="LinkField">Link Field</option>
+                        <option value="ImageField">Image Field</option>
+                        <option value="Checkbox">Checkbox</option>
+                        <option value="MultilineText">Multiline Text</option>
                     </select>
                     <div class="checkbox-wrapper">
                         <input type="checkbox" id="required-\${fieldCount}">
@@ -1030,25 +1227,92 @@ async function getWebviewContent() {
                 fieldCount++;
             }
 
+            function addPlaceholder() {
+                const placeholdersContainer = document.getElementById('placeholders');
+                const placeholderRow = document.createElement('div');
+                placeholderRow.className = 'field-row placeholder-row';
+                placeholderRow.innerHTML = \`
+                    <input type="text" placeholder="Placeholder name" required>
+                    <input type="text" placeholder="Placeholder key" required>
+                    <select class="placeholder-type" onchange="updatePlaceholderKey(this)">
+                        <option value="static">Static</option>
+                        <option value="dynamic">Dynamic</option>
+                    </select>
+                    <button onclick="this.parentElement.remove()" title="Remove placeholder" type="button">×</button>
+                \`;
+                placeholdersContainer.appendChild(placeholderRow);
+                
+                // Focus the new placeholder's name input
+                const newInput = placeholderRow.querySelector('input[type="text"]');
+                if (newInput) {
+                    newInput.focus();
+                }
+            }
+
+            function updatePlaceholderKey(select) {
+                const row = select.closest('.placeholder-row');
+                const keyInput = row.querySelectorAll('input[type="text"]')[1];
+                const currentKey = keyInput.value;
+                
+                if (select.value === 'dynamic') {
+                    if (!currentKey.endsWith('-{*}')) {
+                        keyInput.value = currentKey + '-{*}';
+                    }
+                } else {
+                    if (currentKey.endsWith('-{*}')) {
+                        keyInput.value = currentKey.slice(0, -4);
+                    }
+                }
+            }
+
+            // Add event listener for placeholder type change
+            document.getElementById('hasPlaceholders').addEventListener('change', function() {
+                const placeholderSection = document.getElementById('placeholderSection');
+                const placeholderConfig = document.getElementById('placeholderConfig');
+                if (this.value === 'yes') {
+                    placeholderSection.style.display = 'block';
+                    placeholderConfig.style.display = 'block';
+                    if (!document.querySelector('.placeholder-row')) {
+                        addPlaceholder();
+                    }
+                } else {
+                    placeholderSection.style.display = 'none';
+                    placeholderConfig.style.display = 'none';
+                }
+            });
+
             function createComponent() {
                 const componentName = document.getElementById('componentName').value;
                 const componentType = document.getElementById('componentType').value;
-                const placeholderType = document.getElementById('placeholderType').value;
+                const hasPlaceholders = document.getElementById('hasPlaceholders').value;
                 
                 if (!componentName) {
                     alert('Please enter a component name');
                     return;
                 }
 
-                const fieldRows = document.querySelectorAll('.field-row');
+                const fieldRows = document.querySelectorAll('.field-row:not(.placeholder-row)');
                 const fields = Array.from(fieldRows).map(row => ({
                     label: row.querySelector('input[type="text"]').value,
                     value: row.querySelector('select').value,
                     isRequired: row.querySelector('input[type="checkbox"]').checked
                 }));
 
+                const placeholders = hasPlaceholders === 'yes' 
+                    ? Array.from(document.querySelectorAll('.placeholder-row')).map(row => ({
+                        name: row.querySelectorAll('input[type="text"]')[0].value,
+                        key: row.querySelectorAll('input[type="text"]')[1].value,
+                        type: row.querySelector('select').value
+                    }))
+                    : [];
+
                 if (fields.some(field => !field.label)) {
                     alert('Please fill in all field names');
+                    return;
+                }
+
+                if (hasPlaceholders === 'yes' && placeholders.some(p => !p.name || !p.key)) {
+                    alert('Please fill in all placeholder information');
                     return;
                 }
 
@@ -1061,11 +1325,21 @@ async function getWebviewContent() {
                     data: {
                         componentName,
                         componentType,
-                        placeholderType,
-                        fields
+                        hasPlaceholders,
+                        fields,
+                        placeholders
                     }
                 });
             }
+
+            // Add the placeholder section to the HTML
+            document.querySelector('.form-group:has(#hasPlaceholders)').insertAdjacentHTML('afterend', \`
+                <div id="placeholderSection" class="section-title" style="display: none;">Placeholder Configuration</div>
+                <div id="placeholderConfig" class="form-group" style="display: none;">
+                    <div id="placeholders" class="fields-container"></div>
+                    <button class="add-field" onclick="addPlaceholder()">+ Add Placeholder</button>
+                </div>
+            \`);
 
             // Add initial field
             addField();
