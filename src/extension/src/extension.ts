@@ -49,6 +49,112 @@ class ComponentStateManager {
     }
 }
 
+type TemplateResponse = {
+    data?: {
+        createItemTemplate?: {
+            itemTemplate?: {
+                templateId: string;
+                name: string;
+                ownFields: {
+                    nodes: Array<{
+                        name: string;
+                        type: string;
+                    }>;
+                };
+            };
+        };
+    };
+    errors?: Array<{ message: string }>;
+};
+
+async function createTemplate(
+    instanceUrl: string,
+    accessToken: string,
+    templateName: string,
+    templateParent: string,
+    fields: Array<{ label: string; value: string; isRequired: boolean }>
+): Promise<TemplateResponse> {
+    const templateQuery = `
+        mutation {
+            createItemTemplate(
+                input: {
+                    name: "${templateName}",
+                    parent: "${templateParent}",
+                    createStandardValuesItem: true,
+                    sections: {
+                        name: "Content",
+                        fields: [
+                            ${fields
+                                .map(
+                                    (field) => `{
+                                name: "${field.label}",
+                                type: "${(() => {
+                                    switch (field.value) {
+                                        case "RichText":
+                                            return "Rich Text";
+                                        case "SingleLineText":
+                                            return "Single-Line Text";
+                                        case "MultilineText":
+                                            return "Multi-Line Text";
+                                        case "ImageField":
+                                            return "Image";
+                                        case "LinkField":
+                                            return "General Link";
+                                        case "Checkbox":
+                                            return "Checkbox";
+                                        default:
+                                            return field.value;
+                                    }
+                                })()}"
+                            }`
+                                )
+                                .join(",\n")}
+                        ]
+                    }
+                }
+            ) {
+                itemTemplate {
+                    templateId
+                    name
+                    ownFields {
+                        nodes {
+                            name
+                            type
+                        }
+                    }
+                }
+            }
+        }`;
+
+    const response = await fetch(
+        `${instanceUrl}/sitecore/api/authoring/graphql/v1`,
+        {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${accessToken}`,
+                "X-GQL-Token": accessToken,
+            },
+            body: JSON.stringify({ query: templateQuery }),
+        }
+    );
+
+    return (await response.json()) as TemplateResponse;
+}
+
+function formatComponentName(name: string, toPascalCase: boolean): string {
+    if (toPascalCase) {
+        return name
+            .split(/[\s-]/)
+            .map(
+                (word) =>
+                    word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+            )
+            .join("");
+    }
+    return name;
+}
+
 function activate(context: { subscriptions: any[] }) {
     const stateManager = ComponentStateManager.getInstance();
 
@@ -98,7 +204,12 @@ function activate(context: { subscriptions: any[] }) {
                             chatGptApiKey,
                             chatGptOrganizationId,
                         } = message.data;
-                        const propsTypeName = `${componentName}Props`;
+
+                        const codeName = formatComponentName(
+                            componentName,
+                            true
+                        );
+                        const propsTypeName = `${codeName}Props`;
 
                         let returnSnippet;
                         let fieldsTypesImports: string[] = [];
@@ -106,13 +217,13 @@ function activate(context: { subscriptions: any[] }) {
 
                         switch (componentType) {
                             case "withDatasourceCheck":
-                                returnSnippet = `export default withDatasourceCheck()<${propsTypeName}>(${componentName});`;
+                                returnSnippet = `export default withDatasourceCheck()<${propsTypeName}>(${codeName});`;
                                 break;
                             case "withDatasourceRendering":
-                                returnSnippet = `export default withDatasourceRendering()<${propsTypeName}>(${componentName});`;
+                                returnSnippet = `export default withDatasourceRendering()<${propsTypeName}>(${codeName});`;
                                 break;
                             default:
-                                returnSnippet = `export default ${componentName};`;
+                                returnSnippet = `export default ${codeName};`;
                         }
 
                         fields.forEach((field: { value: any }) => {
@@ -246,69 +357,79 @@ function activate(context: { subscriptions: any[] }) {
                         }
 
                         let tsxCode = `import { ${typesImports}, ${fieldImports} } from '@sitecore-jss/sitecore-jss-nextjs';
-                        import { ComponentProps } from 'lib/component-props';
-                        ${
-                            componentType === "withDatasourceRendering"
-                                ? "import { withDatasourceRendering } from '@constellation4sitecore/foundation-enhancers';"
-                                : ""
-                        }
+import { ComponentProps } from 'lib/component-props';
+${
+    componentType === "withDatasourceRendering"
+        ? "import { withDatasourceRendering } from '@constellation4sitecore/foundation-enhancers';"
+        : ""
+}
 
-                        interface Fields {
-                            ${interfaceFields}
-                        }
+interface Fields {
+    ${interfaceFields}
+}
 
-                        type ${propsTypeName} = ComponentProps & {
-                            fields: Fields;
-                        };
+type ${propsTypeName} = ComponentProps & {
+    fields: Fields;
+};
 
-                        const ${componentName} = ({ fields, params, ${
-                                                    placeholderMarkup && `rendering`
-                                                } }: ${propsTypeName}) => {
-                            ${placeholderMarkup && "const id = params.RenderingIdentifier;"}
-                            return (
-                                <section className={params.styles} ${
-                                    placeholderMarkup && "id={id ? id : undefined}"
-                                }>
-                                    ${fieldsMarkup}
-                                    ${placeholderMarkup}
-                                </section>
-                            );
-                        };
-                        ${returnSnippet}`
+const ${codeName} = ({ fields, params, ${
+                            placeholderMarkup && `rendering`
+                        } }: ${propsTypeName}) => {
+    ${placeholderMarkup && "const id = params.RenderingIdentifier;"}
+    return (
+        <section className={params.styles} ${
+            placeholderMarkup && "id={id ? id : undefined}"
+        }>
+            ${fieldsMarkup}
+            ${placeholderMarkup}
+        </section>
+    );
+};
+${returnSnippet}`;
 
-                        if(!(chatGptApiKey === undefined || chatGptApiKey === null || chatGptApiKey === "")) {
+                        if (
+                            !(
+                                chatGptApiKey === undefined ||
+                                chatGptApiKey === null ||
+                                chatGptApiKey === ""
+                            )
+                        ) {
                             try {
-                                const openai = new OpenAI(({
+                                const openai = new OpenAI({
                                     apiKey: chatGptApiKey,
                                     organization: chatGptOrganizationId,
-                                }));    
-    
+                                });
+
                                 const prompt = `
                                 Add styled-jsx styling to the following NextJS tsx component. Return only code with no explanation and
                                 if a placeholder html element is present, do not modify it.
                                 ${tsxCode}
                                 `;
-                                
-                                const completion = await openai.chat.completions.create({
-                                model: "o3-mini",
-                                reasoning_effort: "medium",
-                                messages: [
-                                    {
-                                    role: "user", 
-                                    content: prompt
-                                    }
-                                ],
-                                store: false,
-                                });
-    
-                                tsxCode = completion.choices[0].message.content ?? "";
+
+                                const completion =
+                                    await openai.chat.completions.create({
+                                        model: "o3-mini",
+                                        reasoning_effort: "medium",
+                                        messages: [
+                                            {
+                                                role: "user",
+                                                content: prompt,
+                                            },
+                                        ],
+                                        store: false,
+                                    });
+
+                                tsxCode =
+                                    completion.choices[0].message.content ?? "";
                             } catch (error) {
                                 panel.webview.postMessage({
                                     command: "error",
-                                    message: "Failed to call chatgpt with issue: " + error,
+                                    message:
+                                        "Failed to call chatgpt with issue: " +
+                                        error,
                                 });
                                 return;
-                            }                         
+                            }
                         }
 
                         const snippet = new vscode.SnippetString(tsxCode);
@@ -328,7 +449,7 @@ function activate(context: { subscriptions: any[] }) {
                         // After successful creation, ask if they want to deploy
                         const deploy =
                             await vscode.window.showInformationMessage(
-                                `Component ${componentName} created successfully. Would you like to deploy it to Sitecore?`,
+                                `Component ${codeName} created successfully. Would you like to deploy it to Sitecore?`,
                                 "Yes",
                                 "No"
                             );
@@ -392,59 +513,156 @@ function activate(context: { subscriptions: any[] }) {
                                 placeholderParent,
                             } = message.data;
 
-                            // We already checked for componentData.fields earlier
-                            const fieldsJson = componentData.fields!.map(
-                                (field) => ({
-                                    name: field.label,
-                                    type:
-                                        field.value === "SingleLineText" ||
-                                        field.value === "MultilineText"
-                                            ? "Single-Line Text"
-                                            : field.value === "RichText"
-                                            ? "Rich Text"
-                                            : field.value === "ImageField"
-                                            ? "Image"
-                                            : field.value === "Checkbox"
-                                            ? "Checkbox"
-                                            : "General Link",
-                                })
+                            let placeholderIds: string[] = [];
+                            const codeName = formatComponentName(
+                                templateName,
+                                true
+                            );
+                            const sitecoreName = formatComponentName(
+                                templateName,
+                                false
                             );
 
-                            console.log(
-                                "Sending GraphQL request with fields:",
-                                fieldsJson
-                            );
+                            // Create placeholders if they exist
+                            if (
+                                componentData.hasPlaceholders === "yes" &&
+                                componentData.placeholders &&
+                                componentData.placeholders.length > 0 &&
+                                placeholderParent
+                            ) {
+                                console.log(
+                                    "Creating placeholders:",
+                                    componentData.placeholders
+                                );
 
-                            const graphqlQuery = `
-                                mutation {
-                                    createItemTemplate(
-                                        input: {
-                                            name: "${templateName}",
-                                            parent: "${templateParent}",
-                                            createStandardValuesItem: true,
-                                            sections: {
-                                                name: "Data",
-                                                fields: [
-                                                    ${fieldsJson
-                                                        .map(
-                                                            (field) =>
-                                                                `{ name: "${field.name}", type: "${field.type}", defaultValue: "$name" }`
-                                                        )
-                                                        .join(",\n")}
-                                                ]
+                                for (const placeholder of componentData.placeholders) {
+                                    const placeholderQuery = `
+                                        mutation {
+                                            createItem(
+                                                input: {
+                                                    name: "${placeholder.name}",
+                                                    templateId: "{5C547D4E-7111-4995-95B0-6B561751BF2E}",
+                                                    parent: "${placeholderParent}",
+                                                    language: "en",
+                                                    fields: [
+                                                        { name: "Placeholder Key", value: "${placeholder.key}" }
+                                                    ]
+                                                }
+                                            ) {
+                                                item {
+                                                    itemId
+                                                    name
+                                                    path
+                                                }
                                             }
+                                        }`;
+
+                                    try {
+                                        const placeholderResponse = await fetch(
+                                            `${instanceUrl}/sitecore/api/authoring/graphql/v1`,
+                                            {
+                                                method: "POST",
+                                                headers: {
+                                                    "Content-Type":
+                                                        "application/json",
+                                                    Authorization: `Bearer ${accessToken}`,
+                                                    "X-GQL-Token": accessToken,
+                                                },
+                                                body: JSON.stringify({
+                                                    query: placeholderQuery,
+                                                }),
+                                            }
+                                        );
+
+                                        const placeholderResult =
+                                            (await placeholderResponse.json()) as {
+                                                data?: {
+                                                    createItem?: {
+                                                        item?: {
+                                                            itemId: string;
+                                                            name: string;
+                                                            path: string;
+                                                        };
+                                                    };
+                                                };
+                                                errors?: Array<{
+                                                    message: string;
+                                                }>;
+                                            };
+
+                                        if (
+                                            placeholderResult.data?.createItem
+                                                ?.item?.itemId
+                                        ) {
+                                            placeholderIds.push(
+                                                placeholderResult.data
+                                                    .createItem.item.itemId
+                                            );
+                                        }
+                                    } catch (error) {
+                                        console.error(
+                                            `Error creating placeholder ${placeholder.name}:`,
+                                            error
+                                        );
+                                    }
+                                }
+                            }
+
+                            // Only create template if component type is withDatasourceCheck
+                            let templateId = undefined;
+                            if (
+                                componentData.componentType ===
+                                "withDatasourceCheck"
+                            ) {
+                                const templateResult = await createTemplate(
+                                    instanceUrl,
+                                    accessToken,
+                                    sitecoreName,
+                                    templateParent,
+                                    componentData.fields!
+                                );
+                                if (templateResult.errors) {
+                                    throw new Error(
+                                        templateResult.errors[0].message
+                                    );
+                                }
+                                templateId =
+                                    templateResult.data?.createItemTemplate
+                                        ?.itemTemplate?.templateId;
+                            }
+
+                            // Create rendering
+                            const renderingQuery = `
+                                mutation {
+                                    createItem(
+                                        input: {
+                                            name: "${sitecoreName}",
+                                            templateId: "{04646A89-996F-4EE7-878A-FFDBF1F0EF0D}",
+                                            parent: "${renderingParent}",
+                                            language: "en",
+                                            fields: [
+                                                { name: "componentName", value: "${codeName}" }
+                                                ${
+                                                    placeholderIds.length > 0
+                                                        ? `, { name: "Placeholders", value: "${placeholderIds.join(
+                                                              "|"
+                                                          )}" }`
+                                                        : ""
+                                                }
+                                            ]
                                         }
                                     ) {
-                                        itemTemplate {
+                                        item {
+                                            itemId
                                             name
-                                            templateId
+                                            path
                                         }
                                     }
                                 }`;
 
-                            console.log("GraphQL Query:", graphqlQuery);
+                            console.log("Rendering Query:", renderingQuery);
 
-                            const response = await fetch(
+                            const renderingResponse = await fetch(
                                 `${instanceUrl}/sitecore/api/authoring/graphql/v1`,
                                 {
                                     method: "POST",
@@ -454,233 +672,54 @@ function activate(context: { subscriptions: any[] }) {
                                         "X-GQL-Token": accessToken,
                                     },
                                     body: JSON.stringify({
-                                        query: graphqlQuery,
+                                        query: renderingQuery,
                                     }),
                                 }
                             );
 
-                            const responseText = await response.text();
-                            console.log("Raw response:", responseText);
+                            const renderingResponseText =
+                                await renderingResponse.text();
+                            console.log(
+                                "Raw rendering response:",
+                                renderingResponseText
+                            );
 
-                            const result = JSON.parse(responseText) as {
+                            const renderingResult = JSON.parse(
+                                renderingResponseText
+                            ) as {
                                 data?: {
-                                    createItemTemplate?: {
-                                        itemTemplate?: {
+                                    createItem?: {
+                                        item?: {
+                                            itemId: string;
                                             name: string;
-                                            templateId: string;
+                                            path: string;
                                         };
                                     };
                                 };
                                 errors?: Array<{ message: string }>;
                             };
 
-                            console.log("Parsed response:", result);
-
-                            if (result.errors) {
-                                throw new Error(result.errors[0].message);
+                            if (renderingResult.errors) {
+                                throw new Error(
+                                    renderingResult.errors[0].message
+                                );
                             }
 
                             if (
-                                result.data?.createItemTemplate?.itemTemplate
-                                    ?.name
+                                renderingResult.data?.createItem?.item?.itemId
                             ) {
-                                const templateId =
-                                    result.data.createItemTemplate.itemTemplate
-                                        .templateId;
-                                let placeholderIds: string[] = [];
-
-                                // Create placeholders if they exist
-                                if (
-                                    componentData.hasPlaceholders === "yes" &&
-                                    componentData.placeholders &&
-                                    componentData.placeholders.length > 0 &&
-                                    placeholderParent
-                                ) {
-                                    console.log(
-                                        "Creating placeholders:",
-                                        componentData.placeholders
-                                    );
-
-                                    for (const placeholder of componentData.placeholders) {
-                                        const placeholderQuery = `
-                                            mutation {
-                                                createItem(
-                                                    input: {
-                                                        name: "${placeholder.name}",
-                                                        templateId: "{5C547D4E-7111-4995-95B0-6B561751BF2E}",
-                                                        parent: "${placeholderParent}",
-                                                        language: "en",
-                                                        fields: [
-                                                            { name: "Placeholder Key", value: "${placeholder.key}" }
-                                                        ]
-                                                    }
-                                                ) {
-                                                    item {
-                                                        itemId
-                                                        name
-                                                        path
-                                                    }
-                                                }
-                                            }`;
-
-                                        try {
-                                            const placeholderResponse =
-                                                await fetch(
-                                                    `${instanceUrl}/sitecore/api/authoring/graphql/v1`,
-                                                    {
-                                                        method: "POST",
-                                                        headers: {
-                                                            "Content-Type":
-                                                                "application/json",
-                                                            Authorization: `Bearer ${accessToken}`,
-                                                            "X-GQL-Token":
-                                                                accessToken,
-                                                        },
-                                                        body: JSON.stringify({
-                                                            query: placeholderQuery,
-                                                        }),
-                                                    }
-                                                );
-
-                                            const placeholderResult =
-                                                (await placeholderResponse.json()) as {
-                                                    data?: {
-                                                        createItem?: {
-                                                            item?: {
-                                                                itemId: string;
-                                                                name: string;
-                                                                path: string;
-                                                            };
-                                                        };
-                                                    };
-                                                    errors?: Array<{
-                                                        message: string;
-                                                    }>;
-                                                };
-
-                                            if (
-                                                placeholderResult.data
-                                                    ?.createItem?.item?.itemId
-                                            ) {
-                                                placeholderIds.push(
-                                                    placeholderResult.data
-                                                        .createItem.item.itemId
-                                                );
-                                            }
-                                        } catch (error) {
-                                            console.error(
-                                                `Error creating placeholder ${placeholder.name}:`,
-                                                error
-                                            );
-                                        }
-                                    }
-                                }
-
-                                // After template and placeholders are created, create the rendering item
-                                const renderingQuery = `
-                                    mutation {
-                                        createItem(
-                                            input: {
-                                                name: "${templateName}",
-                                                templateId: "{04646A89-996F-4EE7-878A-FFDBF1F0EF0D}",
-                                                parent: "${renderingParent}",
-                                                language: "en",
-                                                fields: [
-                                                    { name: "componentName", value: "${templateName}" }
-                                                    ${
-                                                        placeholderIds.length >
-                                                        0
-                                                            ? `,
-                                                    { name: "Placeholders", value: "${placeholderIds.join(
-                                                        "|"
-                                                    )}" }`
-                                                            : ""
-                                                    }
-                                                ]
-                                            }
-                                        ) {
-                                            item {
-                                                itemId
-                                                name
-                                                path
-                                                fields(ownFields: true, excludeStandardFields: true) {
-                                                    nodes {
-                                                        name
-                                                        value
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }`;
-
-                                console.log("Rendering Query:", renderingQuery);
-
-                                const renderingResponse = await fetch(
-                                    `${instanceUrl}/sitecore/api/authoring/graphql/v1`,
-                                    {
-                                        method: "POST",
-                                        headers: {
-                                            "Content-Type": "application/json",
-                                            Authorization: `Bearer ${accessToken}`,
-                                            "X-GQL-Token": accessToken,
-                                        },
-                                        body: JSON.stringify({
-                                            query: renderingQuery,
-                                        }),
-                                    }
-                                );
-
-                                const renderingResponseText =
-                                    await renderingResponse.text();
-                                console.log(
-                                    "Raw rendering response:",
-                                    renderingResponseText
-                                );
-
-                                const renderingResult = JSON.parse(
-                                    renderingResponseText
-                                ) as {
-                                    data?: {
-                                        createItem?: {
-                                            item?: {
-                                                itemId: string;
-                                                name: string;
-                                                path: string;
-                                            };
-                                        };
-                                    };
-                                    errors?: Array<{ message: string }>;
-                                };
-
-                                if (renderingResult.errors) {
-                                    throw new Error(
-                                        renderingResult.errors[0].message
-                                    );
-                                }
-
-                                if (
-                                    renderingResult.data?.createItem?.item
-                                        ?.itemId
-                                ) {
-                                    panel.webview.postMessage({
-                                        command: "success",
-                                        message: `${
-                                            placeholderIds.length > 0
-                                                ? "Placeholders and "
-                                                : ""
-                                        } Rendering created successfully!`,
-                                    });
-                                } else {
-                                    panel.webview.postMessage({
-                                        command: "error",
-                                        message: "Failed to create rendering",
-                                    });
-                                }
+                                panel.webview.postMessage({
+                                    command: "success",
+                                    message: `${
+                                        placeholderIds.length > 0
+                                            ? "Placeholders and "
+                                            : ""
+                                    } Rendering created successfully!`,
+                                });
                             } else {
                                 panel.webview.postMessage({
                                     command: "error",
-                                    message:
-                                        "Failed to create template - no name returned",
+                                    message: "Failed to create rendering",
                                 });
                             }
                         } catch (error) {
