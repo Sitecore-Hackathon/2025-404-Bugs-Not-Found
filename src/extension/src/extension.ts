@@ -1,5 +1,6 @@
 import { getCreateComponentContent } from "./getCreateComponentContent";
 import { getDeployComponentContent } from "./getDeployComponentContent";
+import OpenAI from "openai";
 
 const vscode = require("vscode");
 const fs = require("fs");
@@ -83,7 +84,8 @@ function activate(context: { subscriptions: any[] }) {
                             key: string;
                             type: string;
                         }>;
-                        hasChatGptApiKey: string;
+                        chatGptApiKey: string;
+                        chatGptOrganizationId: string;
                     };
                 }) => {
                     if (message.command === "createSnippet") {
@@ -93,7 +95,8 @@ function activate(context: { subscriptions: any[] }) {
                             hasPlaceholders,
                             fields,
                             placeholders,
-                            hasChatGptApiKey,
+                            chatGptApiKey,
+                            chatGptOrganizationId,
                         } = message.data;
                         const propsTypeName = `${componentName}Props`;
 
@@ -242,8 +245,7 @@ function activate(context: { subscriptions: any[] }) {
                                 .join("\n            ");
                         }
 
-                        const snippet = new vscode.SnippetString();
-                        snippet.appendText(`import { ${typesImports}, ${fieldImports} } from '@sitecore-jss/sitecore-jss-nextjs';
+                        let tsxCode = `import { ${typesImports}, ${fieldImports} } from '@sitecore-jss/sitecore-jss-nextjs';
                         import { ComponentProps } from 'lib/component-props';
                         ${
                             componentType === "withDatasourceRendering"
@@ -272,7 +274,40 @@ function activate(context: { subscriptions: any[] }) {
                                 </section>
                             );
                         };
-                        ${returnSnippet}`);
+                        ${returnSnippet}`
+
+                        if(!(chatGptApiKey === undefined || chatGptApiKey === null || chatGptApiKey === "" || chatGptOrganizationId === undefined || chatGptOrganizationId === null || chatGptOrganizationId === "")) {
+                            const openai = new OpenAI(({
+                                apiKey: chatGptApiKey,
+                                organization: chatGptOrganizationId,
+                            }));    
+
+                            const prompt = `
+                            Add styled-jsx styling to the following NextJS tsx component. Return only code with no explanation
+                            ${tsxCode}
+                            `;
+                            
+                            const completion = await openai.chat.completions.create({
+                            model: "o3-mini",
+                            reasoning_effort: "medium",
+                            messages: [
+                                {
+                                role: "user", 
+                                content: prompt
+                                }
+                            ],
+                            store: false,
+                            });
+
+                            tsxCode = completion.choices[0].message.content ?? tsxCode;
+                        }
+
+                        const snippet = new vscode.SnippetString(tsxCode);
+                        snippet.appendText(tsxCode);
+
+                        /*const newFileUri = `${componentName}.tsx`
+                        await vscode.workspace.fs.writeFile(newFileUri, new TextEncoder().encode(snippet));
+                        vscode.window.showTextDocument(newFileUri, { preview: false });*/
 
                         const uri = vscode.Uri.file(editor.document.fileName);
                         const document =

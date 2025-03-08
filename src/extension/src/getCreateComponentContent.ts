@@ -269,7 +269,11 @@ export async function getCreateComponentContent() {
             <div class="section-title">Style Component with AI (optional)</div>
             <div class="form-group">
                 <label for="chatGptApiKey">ChatGPT Api Key</label>
-                <input type="text" id="chatGptApiKey" required placeholder="Enter your sitecore instance chatGPT api key">
+                <input type="text" id="chatGptApiKey" required placeholder="Enter your chatGPT api key">
+            </div>
+              <div class="form-group">
+                <label for="chatGptOrganizationId">ChatGPT Organization Id</label>
+                <input type="text" id="chatGptOrganizationId" required placeholder="Enter your chatGPT organization id">
             </div>
 
             <button class="create-component" onclick="createComponent()">Create Component</button>
@@ -368,7 +372,8 @@ export async function getCreateComponentContent() {
                 const componentName = document.getElementById('componentName').value;
                 const componentType = document.getElementById('componentType').value;
                 const hasPlaceholders = document.getElementById('hasPlaceholders').value;
-                const hasChatGptApiKey = document.getElementById('chatGptApiKey').value;
+                const chatGptApiKey = document.getElementById('chatGptApiKey').value;
+                const chatGptOrganizationId = document.getElementById('chatGptOrganizationId').value;
                 
                 if (!componentName) {
                     alert('Please enter a component name');
@@ -412,7 +417,8 @@ export async function getCreateComponentContent() {
                         hasPlaceholders,
                         fields,
                         placeholders,
-                        hasChatGptApiKey
+                        chatGptApiKey,
+                        chatGptOrganizationId
                     }
                 });
             }
